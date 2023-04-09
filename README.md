@@ -16,8 +16,7 @@ export class CustomApplicationStage extends CustomStage {
 
     // instantiate application stacks
     new ApplicationStack(this, 'app', {
-      // set environment where stack will be deployed
-      env: props.env,
+      stackName: 'AppStack',
       // pass additional props to the stacks
       vpcID: props.vpcID,
     });

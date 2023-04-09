@@ -8,17 +8,16 @@ class MyDeployStage extends CustomStage {
   constructor(scope: Construct, id: string, props: CustomStageProps) {
     super(scope, id, props);
 
-    new Stack(this, 'App', { stackName: 'AppStack', env: props.env });
-    new Stack(this, 'Database', { stackName: 'DatabaseStack', env: props.env });
+    new Stack(this, 'App', { stackName: 'AppStack' });
+    new Stack(this, 'Database', { stackName: 'DatabaseStack' });
   }
 }
 
-class RootStack extends Stack {
-  myDeployStage: MyDeployStage;
+class PipelineStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    this.myDeployStage = new MyDeployStage(this, 'MyDeployStage', {
+    new MyDeployStage(this, 'MyDeployStage', {
       synth: new FileSet('12345'),
       env: {
         account: '1234567890',
@@ -29,21 +28,22 @@ class RootStack extends Stack {
 }
 
 const app = new App();
-const rootStack = new RootStack(app, 'RootStack');
+const pipelineStack = new PipelineStack(app, 'PipelineStack');
+const myDeployStage = pipelineStack.node.children[0] as MyDeployStage;
 
 it('Required custom CDK deployment commands are present', () => {
-  expect(rootStack.myDeployStage.commands[0]).toEqual(
-    'npx cdk -a . deploy RootStack/MyDeployStage/App --require-approval never',
+  expect(myDeployStage.commands[0]).toEqual(
+    'npx cdk -a . deploy PipelineStack/MyDeployStage/App --require-approval never',
   );
-  expect(rootStack.myDeployStage.commands[1]).toEqual(
-    'npx cdk -a . deploy RootStack/MyDeployStage/Database --require-approval never',
+  expect(myDeployStage.commands[1]).toEqual(
+    'npx cdk -a . deploy PipelineStack/MyDeployStage/Database --require-approval never',
   );
 });
 
 it('Required policy to assume CDK roles is present', () => {
-  expect(rootStack.myDeployStage.rolePolicyStatements![0].actions).toEqual(['sts:AssumeRole']);
-  expect(rootStack.myDeployStage.rolePolicyStatements![0].resources).toEqual(['*']);
-  expect(rootStack.myDeployStage.rolePolicyStatements![0].conditions).toEqual({
+  expect(myDeployStage.rolePolicyStatements![0].actions).toEqual(['sts:AssumeRole']);
+  expect(myDeployStage.rolePolicyStatements![0].resources).toEqual(['*']);
+  expect(myDeployStage.rolePolicyStatements![0].conditions).toEqual({
     'ForAnyValue:StringEquals': {
       'iam:ResourceTag/aws-cdk:bootstrap-role': ['deploy', 'file-publishing', 'image-publishing'],
     },
@@ -51,12 +51,12 @@ it('Required policy to assume CDK roles is present', () => {
 });
 
 it('Custom stacks are present, and are instantiated in proper environment', () => {
-  const appStack = rootStack.myDeployStage.node.children[0] as Stack;
+  const appStack = myDeployStage.node.children[0] as Stack;
   expect(appStack.stackName).toEqual('AppStack');
   expect(appStack.account).toEqual('1234567890');
   expect(appStack.region).toEqual('af-south-1');
 
-  const databaseStack = rootStack.myDeployStage.node.children[1] as Stack;
+  const databaseStack = myDeployStage.node.children[1] as Stack;
   expect(databaseStack.stackName).toEqual('DatabaseStack');
   expect(databaseStack.account).toEqual('1234567890');
   expect(databaseStack.region).toEqual('af-south-1');

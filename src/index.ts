@@ -1,4 +1,4 @@
-import { Stack } from 'aws-cdk-lib';
+import { Stack, Stage } from 'aws-cdk-lib';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { CodeBuildStep, IFileSetProducer } from 'aws-cdk-lib/pipelines';
 import { Construct, Dependable, Node } from 'constructs';
@@ -36,6 +36,11 @@ export interface CustomStageProps {
     account: string;
     region: string;
   };
+  /**
+   * Name of the stage
+   * @default Stage ID
+   */
+  stageName?: string;
 }
 
 // Custom stacks deployment to regions where CDK deployment is nor supported
@@ -67,5 +72,12 @@ export class CustomStage extends CodeBuildStep {
     Dependable.implement(this, {
       dependencyRoots: [this],
     });
+
+    // stetting parent stage's region and account, so if stack instantiated within
+    // this custom stage don't have it - they can inherit it
+    const parentStage = this.node.scopes.reverse().slice(1).find(Stage.isStage);
+    Object.defineProperty(parentStage, 'region', { value: props.env.region });
+    Object.defineProperty(parentStage, 'account', { value: props.env.account });
+    Object.defineProperty(parentStage, 'stageName', { value: props.stageName ?? id });
   }
 }
